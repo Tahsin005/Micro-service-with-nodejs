@@ -2,6 +2,9 @@ import User from "../models/user.models.js";
 import Blacklisttoken from "../models/blacklisttoken.model.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import { subscribeToQueue } from "../service/rabbit.js";
+import EventEmitter from "events";
+const rideEventEmitter = new EventEmitter();
 
 export const register = async (req, res) => {
     try {
@@ -79,4 +82,20 @@ export const profile = async (req, res) => {
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
-}
+};
+
+export const acceptedRide = async (req, res) => {
+    rideEventEmitter.once('ride-accepted', (data) => {
+        res.send(data);
+    });
+
+    setTimeout(() => {
+        res.status(204).send();
+    }, 30000);
+};
+
+subscribeToQueue('ride-accepted', async (msg) => {
+    const data = JSON.parse(msg);
+    console.log('Accepted ride data', data);
+    rideEventEmitter.emit('ride-accepted', data);
+});

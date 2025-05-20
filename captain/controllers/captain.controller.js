@@ -2,6 +2,9 @@ import Captain from "../models/captain.model.js";
 import Blacklisttoken from "../models/blacklisttoken.model.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import { subscribeToQueue } from "../service/rabbit.js";
+
+const pendingRequests = [];
 
 export const register = async (req, res) => {
     try {
@@ -93,3 +96,22 @@ export const toggleAvailability = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+
+export const waitForNewRide = async(req, res) => {
+    req.setTimeout(30000, () => {
+        res.status(203).end();
+    });
+
+    pendingRequests.push(res);
+}
+
+subscribeToQueue("new-ride", (data) => {
+    console.log(JSON.parse(data));
+    const rideData = JSON.parse(data);
+
+    pendingRequests.forEach(res => {
+        res.send(rideData);
+    });
+
+    pendingRequests.length = 0;
+});
